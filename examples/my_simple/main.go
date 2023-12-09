@@ -31,6 +31,7 @@ func main() {
 	flag.Parse()
 	rand.Seed(time.Now().Unix())
 
+	// counter vec
 	httpReqs := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "http_requests_total",
@@ -38,8 +39,29 @@ func main() {
 		},
 		[]string{"code", "method"},
 	)
-	prometheus.MustRegister(httpReqs)
 
+	// counter, it's label-key and label-value is const
+	constCounter := prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name:        "test_counter",
+			Help:        "test single counter",
+			ConstLabels: prometheus.Labels{"const_label_key": "const_label_value"},
+		},
+	)
+
+	// gauge vec
+	httpLatency := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "http_reqeust_latency",
+			Help: "http request latency time",
+		},
+		[]string{"path"},
+	)
+	prometheus.MustRegister(httpReqs)
+	prometheus.MustRegister(constCounter)
+	prometheus.MustRegister(httpLatency)
+
+	constCounter.Add(4.4)
 	httpReqs.WithLabelValues("404", "POST").Add(42)
 	go func() {
 		for {
@@ -57,6 +79,9 @@ func main() {
 			time.Sleep(time.Microsecond * 300)
 		}
 	}()
+
+	httpLatency.WithLabelValues("/api/v1/test").Set(0.12)
+	httpLatency.With(prometheus.Labels{"path": "/api/v2/test"}).Add(0.04)
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(*addr, nil))
